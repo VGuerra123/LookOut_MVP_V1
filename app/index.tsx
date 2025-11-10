@@ -1,184 +1,276 @@
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Image, Animated, Easing } from 'react-native';
-import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'expo-router';
-import { Colors, Spacing, BorderRadius, Typography } from '@/constants/theme';
-import { Mail } from 'lucide-react-native';
+import React, { useEffect, useRef, useState } from "react";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
+  Image,
+  Animated,
+  Easing,
+  Dimensions,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
+import { useRouter } from "expo-router";
+import { Mail } from "lucide-react-native";
+
+const { width } = Dimensions.get("window");
 
 export default function LoginScreen() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Animaciones suaves (sin glow/sombras naranjas)
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(40)).current;
 
   useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 1000,
-      easing: Easing.out(Easing.exp),
-      useNativeDriver: true,
-    }).start();
-  }, []);
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
+        easing: Easing.out(Easing.exp),
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 700,
+        easing: Easing.out(Easing.exp),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [fadeAnim, slideAnim]);
 
   const handleContinue = () => {
     if (!email.trim()) return;
-
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
-      if (email.toLowerCase() === 'admin@lookout.com') {
-        router.push({
-          pathname: '/auth/password',
-          params: { email },
-        });
-      } else {
-        router.push({
-          pathname: '/auth/register-step1',
-          params: { email },
-        });
-      }
-    }, 300);
+      router.push({
+        pathname:
+          email.toLowerCase() === "admin@lookout.com"
+            ? "/auth/password"
+            : "/auth/register-step1",
+        params: { email },
+      });
+    }, 400);
   };
 
+  const emailValid = !!email.trim() && /^\S+@\S+\.\S+$/.test(email.trim());
+
   return (
-    <View style={styles.container}>
-      <Animated.View style={[styles.logoContainer, { opacity: fadeAnim }]}>
-        <Image
-          source={require('@/assets/images/logo2.webp')}
-          style={styles.logoImage}
-          resizeMode="contain"
-        />
-        <Text style={styles.slogan}>Tu voz, tu seguridad vial</Text>
-      </Animated.View>
-
-      <View style={styles.form}>
-        <Text style={styles.label}>Correo Electrónico</Text>
-        <View style={styles.inputContainer}>
-          <Mail color={Colors.dark.textSecondary} size={20} />
-          <TextInput
-            style={styles.input}
-            placeholder="correo@ejemplo.com"
-            placeholderTextColor={Colors.dark.textSecondary}
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-        </View>
-
-        <TouchableOpacity
-          style={[styles.button, !email.trim() && styles.buttonDisabled]}
-          onPress={handleContinue}
-          disabled={!email.trim() || loading}
+    <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
+      <StatusBar style="light" />
+      <KeyboardAvoidingView
+        style={styles.avoid}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.scrollContent}
         >
-          {loading ? (
-            <ActivityIndicator color={Colors.dark.text} />
-          ) : (
-            <Text style={styles.buttonText}>Continuar</Text>
-          )}
-        </TouchableOpacity>
+          {/* Fondo minimal */}
+          <View style={styles.bg} />
 
-        <View style={styles.hint}>
-          <Text style={styles.hintText}>
-            Usa <Text style={styles.hintEmail}>admin@lookout.com</Text> para acceso directo
-          </Text>
-        </View>
-      </View>
-    </View>
+          {/* Header */}
+          <Animated.View
+            style={[
+              styles.header,
+              { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
+            ]}
+          >
+            <Image
+              source={require("@/assets/images/icon.png")}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+            <Text style={styles.slogan}>Tu voz, tu seguridad vial</Text>
+          </Animated.View>
+
+          {/* Card / Form */}
+          <Animated.View style={[styles.card, { opacity: fadeAnim }]}>
+            <Text style={styles.label}>Correo electrónico</Text>
+
+            <View
+              style={[
+                styles.inputWrap,
+                !emailValid && email.length > 0 ? styles.inputError : null,
+              ]}
+            >
+              <Mail color="#C8CDD2" size={20} style={{ marginRight: 8 }} />
+              <TextInput
+                style={styles.input}
+                placeholder="correo@ejemplo.com"
+                placeholderTextColor="#8A8F98"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="done"
+              />
+            </View>
+
+            {!emailValid && email.length > 0 && (
+              <Text style={styles.errorText}>Ingresa un correo válido.</Text>
+            )}
+
+            <TouchableOpacity
+              activeOpacity={0.9}
+              style={[
+                styles.button,
+                (!emailValid || loading) && styles.buttonDisabled,
+              ]}
+              onPress={handleContinue}
+              disabled={!emailValid || loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#0B0B0B" />
+              ) : (
+                <Text style={styles.buttonText}>Continuar</Text>
+              )}
+            </TouchableOpacity>
+
+            <Text style={styles.hint}>
+              Usa <Text style={styles.hintStrong}>admin@lookout.com</Text> para
+              acceso directo
+            </Text>
+          </Animated.View>
+
+          {/* Empujar footer al fondo */}
+          <View style={{ flexGrow: 1 }} />
+
+          {/* Footer */}
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>
+              © 2025 <Text style={styles.footerBrand}>LookOut</Text>. Todos los
+              derechos reservados.
+            </Text>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
-/* 🎨 Estilos refinados */
+/* ===================== Estilos ===================== */
 const styles = StyleSheet.create({
-  container: {
+  safe: {
     flex: 1,
-    backgroundColor: '#000',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: Spacing.lg,
+    backgroundColor: "#0B0B0B",
   },
-  logoContainer: {
-    alignItems: 'center',
-    marginBottom: Spacing.xxl * 1.3,
-    shadowColor: '#ff7b00',
-    shadowOpacity: 0.5,
-    shadowOffset: { width: 0, height: 10 },
-    shadowRadius: 30,
-    elevation: 20,
+  avoid: {
+    flex: 1,
   },
-  logoImage: {
-    width: 220,
-    height: 140,
-    borderRadius: 20,
+  scrollContent: {
+    flexGrow: 1,
+    minHeight: "100%",
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 16, // espacio al bottom pero sin “flotar”
+  },
+  bg: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#0B0B0B",
+  },
+  header: {
+    alignItems: "center",
+    marginBottom: 32,
+  },
+  logo: {
+    width: Math.min(width * 0.68, 280),
+    height: 120,
   },
   slogan: {
-    marginTop: 8,
+    marginTop: 12,
     fontSize: 16,
-    color: '#ff7b00',
-    fontWeight: '600',
-    letterSpacing: 0.5,
-    textShadowColor: 'rgba(255, 123, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
+    color: "#C8CDD2",
+    fontWeight: "600",
+    letterSpacing: 0.4,
+    textAlign: "center",
   },
-  form: {
-    width: '100%',
-    backgroundColor: 'rgba(255,255,255,0.02)',
+  card: {
+    width: "100%",
+    backgroundColor: "rgba(255,255,255,0.02)",
     borderRadius: 16,
-    padding: Spacing.lg,
-    shadowColor: '#ff7b00',
-    shadowOpacity: 0.15,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 10,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: "#22262B",
   },
   label: {
-    ...Typography.body,
-    color: Colors.dark.text,
-    marginBottom: Spacing.xs,
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#E7E9EC",
+    marginBottom: 10,
   },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.dark.surface,
-    borderRadius: BorderRadius.lg,
-    paddingHorizontal: Spacing.md,
+  inputWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#111315",
+    borderRadius: 12,
+    paddingHorizontal: 12,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: "#22262B",
+    height: 48,
   },
   input: {
     flex: 1,
-    ...Typography.body,
-    color: Colors.dark.text,
-    paddingVertical: Spacing.md,
+    fontSize: 15,
+    color: "#E7E9EC",
+    paddingVertical: 10,
+  },
+  inputError: {
+    borderColor: "#6C2A2A",
+  },
+  errorText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: "#F3A6A6",
   },
   button: {
-    backgroundColor: '#ff7b00',
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    alignItems: 'center',
-    marginTop: Spacing.lg,
-    shadowColor: '#ff7b00',
-    shadowOpacity: 0.5,
-    shadowOffset: { width: 0, height: 6 },
-    shadowRadius: 10,
-    elevation: 10,
+    backgroundColor: "#F0A259", // acento sobrio
+    marginTop: 22,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
   },
   buttonDisabled: {
-    backgroundColor: '#444',
+    backgroundColor: "#2A2F35",
   },
   buttonText: {
-    ...Typography.button,
-    color: '#fff',
+    fontWeight: "700",
+    fontSize: 16,
+    color: "#0B0B0B",
+    letterSpacing: 0.4,
   },
   hint: {
-    alignItems: 'center',
-    marginTop: Spacing.md,
+    textAlign: "center",
+    color: "#A9B0B8",
+    fontSize: 12.5,
+    marginTop: 14,
   },
-  hintText: {
-    ...Typography.bodySmall,
-    color: Colors.dark.textSecondary,
+  hintStrong: {
+    color: "#E7E9EC",
+    fontWeight: "700",
   },
-  hintEmail: {
-    color: '#ff7b00',
+  footer: {
+    marginTop: "auto",
+    alignItems: "center",
+    paddingTop: 20,
+  },
+  footerText: {
+    color: "#8A8F98",
+    fontSize: 12.5,
+    textAlign: "center",
+  },
+  footerBrand: {
+    color: "#C8CDD2",
+    fontWeight: "700",
   },
 });
