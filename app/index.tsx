@@ -1,4 +1,4 @@
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Image } from 'react-native';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Colors, Spacing, BorderRadius, Typography } from '@/constants/theme';
@@ -32,11 +32,18 @@ export default function LoginScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.content}>
+        {/* Header con logo */}
         <View style={styles.header}>
-          <Text style={styles.logo}>LookOut</Text>
+          <Image
+            source={require('@/assets/images/logo2.webp')}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
+          <Text style={styles.logoText}>LookOut</Text>
           <Text style={styles.subtitle}>Sistema de Grabación y Vigilancia</Text>
         </View>
 
+        {/* Formulario */}
         <View style={styles.form}>
           <Text style={styles.label}>Correo Electrónico</Text>
           <View style={styles.inputContainer}>
@@ -76,6 +83,7 @@ export default function LoginScreen() {
   );
 }
 
+/* 🎨 Estilos visuales */
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -90,15 +98,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: Spacing.xxl,
   },
-  logo: {
+  logoImage: {
+    width: 180,
+    height: 120,
+    marginBottom: Spacing.md,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  logoText: {
     ...Typography.h1,
     color: Colors.dark.primary,
-    marginBottom: Spacing.sm,
+    textShadowColor: 'rgba(255, 255, 255, 0.25)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
   },
   subtitle: {
     ...Typography.bodySmall,
     color: Colors.dark.textSecondary,
     textAlign: 'center',
+    marginTop: 4,
   },
   form: {
     gap: Spacing.lg,
@@ -130,6 +152,11 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.md,
     alignItems: 'center',
     marginTop: Spacing.md,
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 6,
+    elevation: 8,
   },
   buttonDisabled: {
     backgroundColor: Colors.dark.disabled,
