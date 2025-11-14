@@ -1,6 +1,13 @@
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
-import { useRouter } from 'expo-router';
-import { Colors, Spacing, BorderRadius, Typography } from '@/constants/theme';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  Alert,
+} from "react-native";
+import { useRouter } from "expo-router";
+import { Colors, Spacing, BorderRadius, Typography } from "@/constants/theme";
 import {
   User,
   Car,
@@ -9,8 +16,8 @@ import {
   HelpCircle,
   LogOut,
   ChevronRight,
-} from 'lucide-react-native';
-import { useAuth } from '@/contexts/AuthContext';
+} from "lucide-react-native";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function AdministracionScreen() {
   const router = useRouter();
@@ -18,16 +25,16 @@ export default function AdministracionScreen() {
 
   const handleSignOut = () => {
     Alert.alert(
-      'Cerrar Sesión',
-      '¿Estás seguro que deseas salir?',
+      "Cerrar Sesión",
+      "¿Estás seguro que deseas salir?",
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: "Cancelar", style: "cancel" },
         {
-          text: 'Salir',
-          style: 'destructive',
+          text: "Salir",
+          style: "destructive",
           onPress: async () => {
             await signOut();
-            router.replace('/');
+            router.replace("/");
           },
         },
       ]
@@ -37,33 +44,33 @@ export default function AdministracionScreen() {
   const menuItems = [
     {
       icon: User,
-      title: 'Perfil de Usuario',
-      description: 'Edita tu información personal',
-      onPress: () => {},
+      title: "Perfil de Usuario",
+      description: "Editar información personal",
+      onPress: () => router.push("/(tabs)/administracion/perfil"),
     },
     {
       icon: Car,
-      title: 'Información del Vehículo',
-      description: 'Gestiona los datos de tu vehículo',
-      onPress: () => {},
+      title: "Información del Vehículo",
+      description: "Gestionar datos del vehículo",
+      onPress: () => router.push("/(tabs)/administracion/vehiculo"),
     },
     {
       icon: Bell,
-      title: 'Notificaciones',
-      description: 'Configura tus preferencias de alertas',
-      onPress: () => {},
+      title: "Notificaciones",
+      description: "Preferencias de alertas",
+      onPress: () => router.push("/(tabs)/administracion/notificaciones"),
     },
     {
       icon: Lock,
-      title: 'Privacidad y Seguridad',
-      description: 'Controla tu privacidad y seguridad',
-      onPress: () => {},
+      title: "Privacidad y Seguridad",
+      description: "Configuración de seguridad",
+      onPress: () => router.push("/(tabs)/administracion/seguridad"),
     },
     {
       icon: HelpCircle,
-      title: 'Ayuda y Soporte',
-      description: 'Obtén ayuda con la aplicación',
-      onPress: () => {},
+      title: "Ayuda y Soporte",
+      description: "Centro de asistencia",
+      onPress: () => router.push("/(tabs)/administracion/ayuda"),
     },
   ];
 
@@ -76,22 +83,28 @@ export default function AdministracionScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Configuración de Cuenta</Text>
+
           {menuItems.map((item, index) => {
             const IconComponent = item.icon;
             return (
               <TouchableOpacity
                 key={index}
                 style={styles.menuItem}
+                activeOpacity={0.7}
                 onPress={item.onPress}
               >
                 <View style={styles.menuIcon}>
-                  <IconComponent color={Colors.dark.primary} size={24} />
+                  <IconComponent size={22} color={Colors.dark.primary} />
                 </View>
+
                 <View style={styles.menuContent}>
                   <Text style={styles.menuTitle}>{item.title}</Text>
-                  <Text style={styles.menuDescription}>{item.description}</Text>
+                  <Text style={styles.menuDescription}>
+                    {item.description}
+                  </Text>
                 </View>
-                <ChevronRight color={Colors.dark.textSecondary} size={20} />
+
+                <ChevronRight size={18} color={Colors.dark.textSecondary} />
               </TouchableOpacity>
             );
           })}
@@ -99,8 +112,13 @@ export default function AdministracionScreen() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Sesión</Text>
-          <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
-            <LogOut color={Colors.dark.error} size={20} />
+
+          <TouchableOpacity
+            style={styles.signOutButton}
+            onPress={handleSignOut}
+            activeOpacity={0.7}
+          >
+            <LogOut size={20} color={Colors.dark.error} />
             <Text style={styles.signOutText}>Cerrar Sesión</Text>
           </TouchableOpacity>
         </View>
@@ -124,10 +142,12 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     borderBottomWidth: 1,
     borderBottomColor: Colors.dark.border,
+    alignItems: "center",
   },
   title: {
     ...Typography.h2,
     color: Colors.dark.text,
+    fontWeight: "700",
   },
   content: {
     padding: Spacing.lg,
@@ -140,24 +160,26 @@ const styles = StyleSheet.create({
     ...Typography.h3,
     color: Colors.dark.text,
     marginBottom: Spacing.xs,
+    fontWeight: "600",
   },
   menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: Colors.dark.surface,
     padding: Spacing.md,
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.lg,
     gap: Spacing.md,
     borderWidth: 1,
     borderColor: Colors.dark.border,
+    elevation: 2,
   },
   menuIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: BorderRadius.sm,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     backgroundColor: Colors.dark.surfaceVariant,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   menuContent: {
     flex: 1,
@@ -166,31 +188,32 @@ const styles = StyleSheet.create({
   menuTitle: {
     ...Typography.body,
     color: Colors.dark.text,
-    fontWeight: '600',
+    fontWeight: "700",
   },
   menuDescription: {
     ...Typography.caption,
     color: Colors.dark.textSecondary,
   },
   signOutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: Colors.dark.surface,
     padding: Spacing.md,
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.lg,
     gap: Spacing.sm,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: Colors.dark.error,
   },
   signOutText: {
     ...Typography.button,
     color: Colors.dark.error,
+    fontWeight: "700",
   },
   footer: {
-    alignItems: 'center',
-    gap: Spacing.xs,
     marginTop: Spacing.xl,
+    alignItems: "center",
+    gap: Spacing.xs,
   },
   footerText: {
     ...Typography.caption,
