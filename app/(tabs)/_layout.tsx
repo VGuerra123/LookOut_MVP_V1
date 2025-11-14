@@ -1,15 +1,16 @@
 // app/(tabs)/_layout.tsx
 import { Tabs } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Animated, Pressable } from "react-native";
+import { Animated, Pressable, View } from "react-native";
 import { BottomTabBarButtonProps } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useRef } from "react";
 
-/* PALETA LOOKOUT */
-const BG = "rgba(10,22,40,0.72)";
-const INACTIVE = "#CFE5FF";
-const ACTIVE = "#2A82F0";
+/* 🎨 PALETA LOOKOUT ELITE PRO */
+const BG = "rgba(10,19,34,0.55)"; // navy + glass
+const ACTIVE = "#2A82F0";         // azul lookout
+const INACTIVE = "#CFE5FF";       // hielo
+const OUTLINE = "rgba(255,255,255,0.15)";
 const GLOW = "rgba(42,130,240,0.55)";
 
 export default function TabsLayout() {
@@ -22,34 +23,40 @@ export default function TabsLayout() {
         headerShown: false,
         tabBarActiveTintColor: ACTIVE,
         tabBarInactiveTintColor: INACTIVE,
+
         tabBarLabelStyle: {
-          fontSize: 11,
+          fontSize: 11.5,
           fontWeight: "600",
-          marginTop: 4,
+          marginTop: 1,
         },
 
-        // 🔥 Barra estilo glass PRO
+        /* 💠 GLASSMORPHISM ULTRA OPTIMIZADO */
         tabBarStyle: {
           position: "absolute",
           backgroundColor: BG,
           height: tabHeight,
-          paddingBottom: Math.max(insets.bottom, 10),
+          paddingBottom: Math.max(insets.bottom, 12),
           paddingTop: 10,
           borderTopWidth: 0,
-          borderRadius: 22,
-          marginHorizontal: 10,
-          marginBottom: 10,
+          borderRadius: 24,
+          marginHorizontal: 14,
+          marginBottom: 14,
+          overflow: "hidden",
+
+          borderWidth: 1,
+          borderColor: OUTLINE,
+
           shadowColor: "#000",
-          shadowOpacity: 0.25,
-          shadowRadius: 18,
-          elevation: 12,
+          shadowOpacity: 0.32,
+          shadowRadius: 24,
+          elevation: 20,
         },
 
-        tabBarButton: (props) => <UltraAnimatedButton {...props} />,
+        tabBarButton: (props) => <EliteTabButton {...props} />,
       }}
     >
 
-      {/* 🏠 HOME */}
+      {/* 🏠 Inicio */}
       <Tabs.Screen
         name="home"
         options={{
@@ -57,14 +64,14 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? "home" : "home-outline"}
-              size={24}
+              size={23}
               color={color}
             />
           ),
         }}
       />
 
-      {/* 📱 MÓVIL */}
+      {/* 📱 Móvil */}
       <Tabs.Screen
         name="mobile"
         options={{
@@ -72,14 +79,14 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? "phone-portrait" : "phone-portrait-outline"}
-              size={24}
+              size={22}
               color={color}
             />
           ),
         }}
       />
 
-      {/* 🖥️ ESTACIONARIO */}
+      {/* 🖥️ Estacionario */}
       <Tabs.Screen
         name="estacionario"
         options={{
@@ -94,23 +101,7 @@ export default function TabsLayout() {
         }}
       />
 
-      {/* ⚙️ ADMIN */}
-      <Tabs.Screen
-        name="administracion"
-        options={{
-          title: "Admin",
-          href: "/(tabs)/administracion", // 🔥 Importantísimo
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons
-              name={focused ? "settings" : "settings-outline"}
-              size={24}
-              color={color}
-            />
-          ),
-        }}
-      />
-
-      {/* 📊 INFORMES */}
+      {/* 📊 Informes */}
       <Tabs.Screen
         name="informes"
         options={{
@@ -118,21 +109,35 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? "bar-chart" : "bar-chart-outline"}
-              size={24}
+              size={23}
               color={color}
             />
           ),
         }}
       />
 
+      {/* ⚙️ Config */}
+      <Tabs.Screen
+        name="administracion"
+        options={{
+          title: "Config",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? "settings" : "settings-outline"}
+              size={23}
+              color={color}
+            />
+          ),
+        }}
+      />
     </Tabs>
   );
 }
 
 /* ============================================================
-   ULTRA ANIMATED BUTTON 
+   ⭐ ELITE TAB BUTTON v4.0 — MOBILE CRITICAL EDITION
 ============================================================ */
-function UltraAnimatedButton({
+function EliteTabButton({
   children,
   accessibilityState,
   onPress,
@@ -141,19 +146,26 @@ function UltraAnimatedButton({
 
   const scale = useRef(new Animated.Value(1)).current;
   const glow = useRef(new Animated.Value(0)).current;
+  const lift = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.parallel([
       Animated.spring(scale, {
-        toValue: focused ? 1.22 : 1,
-        friction: 6,
+        toValue: focused ? 1.14 : 1,
+        friction: 7,
         tension: 120,
         useNativeDriver: true,
       }),
       Animated.timing(glow, {
         toValue: focused ? 1 : 0,
-        duration: 260,
+        duration: 240,
         useNativeDriver: false,
+      }),
+      Animated.spring(lift, {
+        toValue: focused ? -4 : 0,
+        friction: 7,
+        tension: 110,
+        useNativeDriver: true,
       }),
     ]).start();
   }, [focused]);
@@ -161,24 +173,48 @@ function UltraAnimatedButton({
   return (
     <Pressable
       onPress={onPress}
-      style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
+      style={{
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+        paddingHorizontal: 2,
+      }}
+      android_ripple={{ color: "rgba(255,255,255,0.06)" }}
     >
       <Animated.View
         style={[
           {
             paddingVertical: 6,
-            paddingHorizontal: 16,
-            borderRadius: 14,
+            paddingHorizontal: 14,
+            borderRadius: 16,
+
+            transform: [{ scale }, { translateY: lift }],
+
+            /* Fondo focus */
             backgroundColor: focused
-              ? "rgba(42,130,240,0.20)"
-              : "rgba(255,255,255,0.05)",
-            transform: [{ scale }],
+              ? "rgba(42,130,240,0.18)"
+              : "rgba(255,255,255,0.03)",
+
             borderWidth: focused ? 1 : 0,
-            borderColor: focused ? "rgba(255,255,255,0.22)" : "transparent",
+            borderColor: "rgba(255,255,255,0.22)",
+
+            /* Glow pro */
             shadowColor: GLOW,
-            shadowOpacity: focused ? 0.85 : 0,
-            shadowRadius: focused ? 18 : 0,
+            shadowOpacity: glow.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0, 0.9],
+            }),
+            shadowRadius: glow.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0, 14],
+            }),
             shadowOffset: { width: 0, height: 0 },
+
+            /* 🔥 CENTRADO PERFECTO */
+            justifyContent: "center",
+            alignItems: "center",
+            flexDirection: "column",
+            gap: 2,
           },
         ]}
       >

@@ -46,31 +46,31 @@ export default function AdministracionScreen() {
       icon: User,
       title: "Perfil de Usuario",
       description: "Editar información personal",
-      onPress: () => router.push("/(tabs)/administracion/perfil"),
+      onPress: () => router.push("/(tabs)/administracion/perfil/index"),
     },
     {
       icon: Car,
       title: "Información del Vehículo",
       description: "Gestionar datos del vehículo",
-      onPress: () => router.push("/(tabs)/administracion/vehiculo"),
+      onPress: () => router.push("/(tabs)/administracion/vehiculo/index"),
     },
     {
       icon: Bell,
       title: "Notificaciones",
       description: "Preferencias de alertas",
-      onPress: () => router.push("/(tabs)/administracion/notificaciones"),
+      onPress: () => router.push("/(tabs)/administracion/notificaciones/index"),
     },
     {
       icon: Lock,
       title: "Privacidad y Seguridad",
       description: "Configuración de seguridad",
-      onPress: () => router.push("/(tabs)/administracion/seguridad"),
+      onPress: () => router.push("/(tabs)/administracion/seguridad/index"),
     },
     {
       icon: HelpCircle,
       title: "Ayuda y Soporte",
       description: "Centro de asistencia",
-      onPress: () => router.push("/(tabs)/administracion/ayuda"),
+      onPress: () => router.push("/(tabs)/administracion/ayuda/index"),
     },
   ];
 
