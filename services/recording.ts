@@ -1,164 +1,179 @@
-// services/recording.ts
-import * as FileSystem from 'expo-file-system/legacy';
-import { Audio } from 'expo-av';
-import { FFmpegKit } from 'ffmpeg-kit-react-native';
+import * as FileSystem from "expo-file-system/legacy";
+import { Audio } from "expo-av";
 
 interface RecordingConfig {
-  segmentoSegundos?: number;   // 10s por defecto
-  ventanaNSegundos?: number;   // 30s por defecto
-  mute?: boolean;              // grabar sin audio si mic no concedido
+  segmentoSegundos?: number;
+  ventanaNSegundos?: number;
+  mute?: boolean;
 }
-interface RecordingState {
-  activo: boolean;
-  segundosGrabando: number;
-  segmentosEnBuffer: number;
-}
-interface ClipGuardado {
-  pathMp4: string;
-  duracion: number; // estimada por suma de segmentos (FFmpeg luego recorta a exacto)
-  createdAt: Date;
-}
+
 interface Segmento {
   path: string;
-  duracion: number;   // seg
-  timestamp: number;  // ms (inicio estimado)
+  duracion: number;
+  timestamp: number;
+}
+
+interface ClipGuardado {
+  pathMp4: string;
+  duracion: number;
+  createdAt: Date;
 }
 
 class RecordingService {
   private activo = false;
-  private segundosGrabando = 0;
-  private segmentoSegundos = 10;
+  private iniciando = false;
+
+  private segmentoSegundos = 2;
   private ventanaNSegundos = 30;
   private mute = false;
 
-  private segmentos: Segmento[] = [];
-  private intervalo: ReturnType<typeof setInterval> | null = null;
-
-  // CameraView ref (usamos any para evitar choques de tipos entre SDKs)
   private cameraRef: any = null;
-  private iniciando = false;
+  private segmentos: Segmento[] = [];
+
+  private secondsTimer: ReturnType<typeof setInterval> | null = null;
+  private segundosGrabados = 0;
 
   async iniciarGrabacion(config: RecordingConfig = {}) {
     if (this.activo) return;
 
-    this.segmentoSegundos = config.segmentoSegundos ?? 10;
-    this.ventanaNSegundos = config.ventanaNSegundos ?? 30;
-    this.mute = !!config.mute;
-
-    await this.ensureDir(`${FileSystem.documentDirectory!}lookout/segments/`);
-    await this.ensureDir(`${FileSystem.documentDirectory!}lookout/clips/`);
-    await this.ensureDir(`${FileSystem.documentDirectory!}lookout/tmp/`);
-
-    // Audio (no falla si Expo Go)
-    await Audio.setAudioModeAsync({
-      allowsRecordingIOS: true,
-      playsInSilentModeIOS: true,
-      staysActiveInBackground: true,
-    }).catch(() => {});
-
     this.activo = true;
-    this.segundosGrabando = 0;
-    this.segmentos = [];
+    this.iniciando = false;
 
-    this.intervalo = setInterval(() => (this.segundosGrabando += 1), 1000);
+    this.segmentoSegundos = config.segmentoSegundos ?? 2;
+    this.ventanaNSegundos = config.ventanaNSegundos ?? 30;
+    this.mute = config.mute ?? false;
 
-    await this.iniciarNuevoSegmento();
-    console.log('Grabación permanente iniciada');
+    await this.prepareDirectories();
+    await this.prepareAudio();
+
+    this.segundosGrabados = 0;
+
+    this.secondsTimer = setInterval(() => {
+      this.segundosGrabados += 1;
+    }, 1000);
+
+    console.log("🎥 Grabación LookOut iniciada");
+    this.iniciarNuevoSegmento();
   }
 
   async detenerGrabacion() {
     if (!this.activo) return;
+
     this.activo = false;
 
-    if (this.intervalo) {
-      clearInterval(this.intervalo);
-      this.intervalo = null;
-    }
+    if (this.secondsTimer) clearInterval(this.secondsTimer);
+    this.secondsTimer = null;
 
     try {
       this.cameraRef?.stopRecording?.();
     } catch {}
 
     await this.limpiarSegmentos();
-    this.segundosGrabando = 0;
+
     this.segmentos = [];
-    console.log('Grabación detenida');
+    this.segundosGrabados = 0;
+
+    console.log("🛑 Grabación detenida");
   }
 
-  /**
-   * Guarda los últimos N segundos EXACTOS (30s por defecto) desde el momento de captura.
-   * - Dev Client: concatena y recorta con FFmpeg → clip único ~30s.
-   * - Expo Go: fallback → copia el último segmento (no concatena).
-   */
-  async guardarUltimosNsegundos(): Promise<ClipGuardado> {
-    if (!this.activo) throw new Error('No hay grabación activa');
+  private async iniciarNuevoSegmento() {
+    if (!this.activo || this.iniciando) return;
+    this.iniciando = true;
 
-    // Cierra el segmento actual para incluirlo hasta "ahora"
-    try { this.cameraRef?.stopRecording?.(); } catch {}
-    await this.delay(250); // espera a que se escriba
+    try {
+      const rec =
+        this.cameraRef?.recordAsync ??
+        this.cameraRef?.current?.recordAsync;
 
-    const ventana = this.ventanaNSegundos;
-    const segsNecesarios = Math.ceil(ventana / this.segmentoSegundos);
-    const lista = this.segmentos.slice(-segsNecesarios);
-    if (!lista.length) {
-      await this.iniciarNuevoSegmento();
-      throw new Error('No hay segmentos disponibles para guardar');
-    }
-
-    const ts = Date.now();
-    const outDir = `${FileSystem.documentDirectory!}lookout/clips/`;
-    const tmpDir = `${FileSystem.documentDirectory!}lookout/tmp/`;
-    const outFinal = `${outDir}clip_${ts}.mp4`;
-
-    // Suma de duración aprox (para saber si debemos recortar)
-    const totalDur = lista.reduce((acc, s) => acc + s.duracion, 0);
-
-    // Si FFmpeg está disponible (Dev Client), concatenamos + recortamos a EXACTOS 30s.
-    const puedeFFmpeg = await this.ffmpegDisponible();
-
-    if (puedeFFmpeg && lista.length > 1) {
-      // 1) Playlist para concat demuxer
-      const concatTxt = `${tmpDir}concat_${ts}.txt`;
-      const content = lista.map(s => `file '${s.path.replace(/'/g, "'\\''")}'`).join('\n');
-      await FileSystem.writeAsStringAsync(concatTxt, content);
-
-      // 2) Concat sin re-encode
-      const tempConcat = `${tmpDir}concat_${ts}.mp4`;
-      await this.runFFmpeg(`-f concat -safe 0 -i "${concatTxt}" -c copy "${tempConcat}"`);
-
-      // 3) Recortar manteniendo los ÚLTIMOS N s (si sobra)
-      const exceso = Math.max(0, totalDur - ventana);
-      if (exceso > 0) {
-        await this.runFFmpeg(
-          `-ss ${exceso.toFixed(2)} -i "${tempConcat}" -t ${ventana} -c copy "${outFinal}"`
-        );
-      } else {
-        await FileSystem.copyAsync({ from: tempConcat, to: outFinal });
+      if (!rec) {
+        this.iniciando = false;
+        setTimeout(() => this.iniciarNuevoSegmento(), 150);
+        return;
       }
 
-      // Limpieza temporal
-      await this.silentDelete(concatTxt);
-      await this.silentDelete(tempConcat);
-    } else {
-      // Fallback (Expo Go o un solo segmento): copia el último segmento
-      const ultimo = lista[lista.length - 1];
-      await FileSystem.copyAsync({ from: ultimo.path, to: outFinal });
+      const inicio = Date.now();
+      const result = await rec.call(this.cameraRef, {
+        maxDuration: this.segmentoSegundos,
+        mute: this.mute,
+      });
+
+      const uri = result?.uri;
+      if (uri) {
+        const dur = Math.max(
+          1,
+          Math.round((Date.now() - inicio) / 1000)
+        );
+
+        const seg: Segmento = {
+          path: uri,
+          duracion: dur,
+          timestamp: inicio,
+        };
+
+        this.segmentos.push(seg);
+
+        // Mantener ventanas de 30s
+        let acumulado = this.segmentos.reduce((a, s) => a + s.duracion, 0);
+        while (acumulado > this.ventanaNSegundos) {
+          const viejo = this.segmentos.shift();
+          if (viejo) await this.safeDelete(viejo.path);
+          acumulado = this.segmentos.reduce((a, s) => a + s.duracion, 0);
+        }
+      }
+    } catch (err) {
+      console.error("❗Error en segmento:", err);
     }
 
-    // Relanza la cadena de segmentos (grabación permanente)
-    if (this.activo) await this.iniciarNuevoSegmento();
+    this.iniciando = false;
+
+    if (this.activo) {
+      setTimeout(() => this.iniciarNuevoSegmento(), 100);
+    }
+  }
+
+  async guardarUltimosNsegundos(): Promise<ClipGuardado> {
+    if (!this.activo) throw new Error("No se está grabando");
+
+    try {
+      this.cameraRef?.stopRecording?.();
+    } catch {}
+    await this.delay(200);
+
+    const segs = [...this.segmentos];
+    if (!segs.length) throw new Error("Sin segmentos");
+
+    const last = segs[segs.length - 1];
+
+    const dirClips = `${FileSystem.documentDirectory}lookout/clips/`;
+    const ts = Date.now();
+    const out = `${dirClips}clip_${ts}.mp4`;
+
+    await FileSystem.copyAsync({
+      from: last.path,
+      to: out,
+    });
 
     return {
-      pathMp4: outFinal,
-      duracion: Math.min(totalDur, ventana),
+      pathMp4: out,
+      duracion: last.duracion,
       createdAt: new Date(),
     };
   }
 
-  getEstado(): RecordingState {
+  getOverlayData() {
+    return {
+      velocidad: Math.floor(Math.random() * 120),
+      latitud: -33.4372 + (Math.random() - 0.5) * 0.1,
+      longitud: -70.6506 + (Math.random() - 0.5) * 0.1,
+      hora: new Date().toLocaleTimeString("es-CL"),
+      fecha: new Date().toLocaleDateString("es-CL"),
+    };
+  }
+
+  getEstado() {
     return {
       activo: this.activo,
-      segundosGrabando: this.segundosGrabando,
+      segundosGrabando: this.segundosGrabados,
       segmentosEnBuffer: this.segmentos.length,
     };
   }
@@ -167,120 +182,42 @@ class RecordingService {
     this.cameraRef = ref;
   }
 
-  // ===== Cadena de segmentos (grabación permanente) =====
-  private async iniciarNuevoSegmento() {
-    if (!this.activo || this.iniciando) return;
+  private async prepareDirectories() {
+    const root = `${FileSystem.documentDirectory}lookout/`;
+    const dirs = ["segments", "clips", "tmp"];
 
-    const canRecord =
-      this.cameraRef &&
-      (typeof this.cameraRef.recordAsync === 'function' ||
-        typeof this.cameraRef?.current?.recordAsync === 'function');
-    if (!canRecord) {
-      console.warn('Camera ref inválido para recordAsync');
-      return;
-    }
-
-    const rec = this.cameraRef?.recordAsync ?? this.cameraRef?.current?.recordAsync;
-
-    this.iniciando = true;
-    try {
-      const startedAt = Date.now();
-
-      const result = await rec.call(this.cameraRef, {
-        maxDuration: this.segmentoSegundos,
-        mute: this.mute, // evita error RECORD_AUDIO en Expo Go si mic no concedido
-      });
-
-      const uri = result?.uri;
-      if (uri) {
-        const segmento: Segmento = {
-          path: uri,
-          duracion: Math.min(
-            this.segmentoSegundos,
-            Math.max(1, Math.round((Date.now() - startedAt) / 1000))
-          ),
-          timestamp: startedAt,
-        };
-        this.segmentos.push(segmento);
-
-        // Mantener buffer ≈ ventana N (con 1 de margen)
-        const maxSegs = Math.ceil(this.ventanaNSegundos / this.segmentoSegundos) + 1;
-        while (this.segmentos.length > maxSegs) {
-          const viejo = this.segmentos.shift();
-          if (viejo) await this.eliminarArchivo(viejo.path);
-        }
-      }
-    } catch (err) {
-      console.error('Error durante recordAsync:', err);
-    } finally {
-      this.iniciando = false;
-      if (this.activo) {
-        await this.delay(100);
-        await this.iniciarNuevoSegmento();
+    for (const d of dirs) {
+      const full = `${root}${d}/`;
+      const info = await FileSystem.getInfoAsync(full);
+      if (!info.exists) {
+        await FileSystem.makeDirectoryAsync(full, { intermediates: true });
       }
     }
   }
 
-  // ===== Utils =====
-  private async ensureDir(dir: string) {
-    const info = await FileSystem.getInfoAsync(dir);
-    if (!info.exists) await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
+  private async prepareAudio() {
+    try {
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: true,
+      });
+    } catch {}
   }
 
   private async limpiarSegmentos() {
-    for (const s of this.segmentos) {
-      await this.eliminarArchivo(s.path);
-    }
-    this.segmentos = [];
+    for (const s of this.segmentos) await this.safeDelete(s.path);
   }
 
-  private async eliminarArchivo(path: string) {
+  private async safeDelete(path: string) {
     try {
       const info = await FileSystem.getInfoAsync(path);
       if (info.exists) await FileSystem.deleteAsync(path, { idempotent: true });
-    } catch (e) {
-      console.warn('Error eliminando archivo:', e);
-    }
-  }
-
-  private async silentDelete(path: string) {
-    try {
-      await FileSystem.deleteAsync(path, { idempotent: true });
     } catch {}
   }
 
   private delay(ms: number) {
     return new Promise((res) => setTimeout(res, ms));
-  }
-
-  private async ffmpegDisponible() {
-    try {
-      const session = await FFmpegKit.execute('-version');
-      const rc = await session.getReturnCode();
-      return rc?.isValueSuccess?.() ?? false;
-    } catch {
-      return false;
-    }
-  }
-
-  private async runFFmpeg(cmd: string) {
-    const session = await FFmpegKit.execute(cmd);
-    const returnCode = await session.getReturnCode();
-    if (!returnCode?.isValueSuccess()) {
-      const logs = await session.getAllLogsAsString();
-      throw new Error(`FFmpeg error: ${returnCode?.getValue()} | ${logs}`);
-    }
-  }
-
-  // opcional: datos overlay
-  getOverlayData() {
-    return {
-      velocidad: Math.floor(Math.random() * 120),
-      latitud: -33.4372 + (Math.random() - 0.5) * 0.1,
-      longitud: -70.6506 + (Math.random() - 0.5) * 0.1,
-      hora: new Date().toLocaleTimeString('es-CL'),
-      fecha: new Date().toLocaleDateString('es-CL'),
-    };
   }
 }
 

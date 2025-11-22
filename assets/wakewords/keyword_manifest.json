@@ -1,0 +1,13 @@
+{
+  "platforms": {
+    "android": {
+      "keywordPath": "lookout_android.ppn",
+      "sensitivity": 0.65
+    },
+    "ios": {
+      "keywordPath": "lookout_ios.ppn",
+      "sensitivity": 0.65
+    }
+  },
+  "porcupineParams": "porcupine_params.pv"
+}

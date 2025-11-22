@@ -26,7 +26,7 @@ export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Animaciones suaves (sin glow/sombras naranjas)
+  // Animaciones
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(40)).current;
 
@@ -45,20 +45,17 @@ export default function LoginScreen() {
         useNativeDriver: true,
       }),
     ]).start();
-  }, [fadeAnim, slideAnim]);
+  }, []);
 
+  /** 🔥 Nuevo flujo: SIEMPRE → /home */
   const handleContinue = () => {
     if (!email.trim()) return;
+
     setLoading(true);
+
     setTimeout(() => {
       setLoading(false);
-      router.push({
-        pathname:
-          email.toLowerCase() === "admin@lookout.com"
-            ? "/auth/password"
-            : "/auth/register-step1",
-        params: { email },
-      });
+      router.replace("/home"); // 🔥 navegación correcta
     }, 400);
   };
 
@@ -75,10 +72,9 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.scrollContent}
         >
-          {/* Fondo minimal */}
           <View style={styles.bg} />
 
-          {/* Header */}
+          {/* HEADER */}
           <Animated.View
             style={[
               styles.header,
@@ -93,7 +89,7 @@ export default function LoginScreen() {
             <Text style={styles.slogan}>Tu voz, tu seguridad vial</Text>
           </Animated.View>
 
-          {/* Card / Form */}
+          {/* CARD */}
           <Animated.View style={[styles.card, { opacity: fadeAnim }]}>
             <Text style={styles.label}>Correo electrónico</Text>
 
@@ -143,10 +139,9 @@ export default function LoginScreen() {
             </Text>
           </Animated.View>
 
-          {/* Empujar footer al fondo */}
           <View style={{ flexGrow: 1 }} />
 
-          {/* Footer */}
+          {/* FOOTER */}
           <View style={styles.footer}>
             <Text style={styles.footerText}>
               © 2025 <Text style={styles.footerBrand}>LookOut</Text>. Todos los
@@ -159,21 +154,19 @@ export default function LoginScreen() {
   );
 }
 
-/* ===================== Estilos ===================== */
+/* ===================== ESTILOS ===================== */
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: "#0B0B0B",
   },
-  avoid: {
-    flex: 1,
-  },
+  avoid: { flex: 1 },
   scrollContent: {
     flexGrow: 1,
     minHeight: "100%",
     paddingHorizontal: 24,
     paddingTop: 24,
-    paddingBottom: 16, // espacio al bottom pero sin “flotar”
+    paddingBottom: 16,
   },
   bg: {
     ...StyleSheet.absoluteFillObject,
@@ -234,7 +227,7 @@ const styles = StyleSheet.create({
     color: "#F3A6A6",
   },
   button: {
-    backgroundColor: "#F0A259", // acento sobrio
+    backgroundColor: "#F0A259",
     marginTop: 22,
     paddingVertical: 14,
     borderRadius: 12,

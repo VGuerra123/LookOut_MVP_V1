@@ -1,8 +1,21 @@
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Platform } from 'react-native';
-import { useState, useRef, useEffect } from 'react';
-import { Colors, Spacing, BorderRadius, Typography } from '@/constants/theme';
-import { Minimize2, Maximize2, Square, Camera } from 'lucide-react-native';
-import { recordingService } from '@/services/recording';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Animated,
+  PanResponder,
+  Dimensions,
+  Platform,
+} from "react-native";
+
+import { useState, useRef, useEffect } from "react";
+import { Colors, Spacing, BorderRadius, Typography } from "@/constants/theme";
+import { Minimize2, Maximize2, Square, Camera } from "lucide-react-native";
+import { recordingService } from "@/services/recording";
+import * as Haptics from "expo-haptics";
+
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
 interface OverlayWidgetProps {
   onDetener: () => void;
@@ -18,287 +31,364 @@ export default function OverlayWidget({
   isMinimized,
 }: OverlayWidgetProps) {
   const [estado, setEstado] = useState(recordingService.getEstado());
-  const [overlayData, setOverlayData] = useState(recordingService.getOverlayData());
+  const [overlayData, setOverlayData] = useState(
+    recordingService.getOverlayData()
+  );
+
+  /** Animación pulso */
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
+  /** Animación flash LookOut */
+  const flashAnim = useRef(new Animated.Value(0)).current;
+
+  /** Posición de la burbuja flotante */
+  const pan = useRef(new Animated.ValueXY({ x: SCREEN_W - 90, y: 100 })).current;
+
+  /** DRAG BURBUJA */
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => isMinimized,
+      onPanResponderMove: Animated.event(
+        [null, { dx: pan.x, dy: pan.y }],
+        { useNativeDriver: false }
+      ),
+      onPanResponderRelease: (_, gesture) => {
+        // Adhesión al borde más cercano
+        const finalX = gesture.moveX > SCREEN_W / 2 ? SCREEN_W - 70 : 20;
+
+        Animated.spring(pan, {
+          toValue: { x: finalX, y: gesture.moveY - 40 },
+          useNativeDriver: false,
+        }).start();
+      },
+    })
+  ).current;
+
+  /** Intervalos */
   useEffect(() => {
-    // Actualizar estado cada segundo
     const interval = setInterval(() => {
       setEstado(recordingService.getEstado());
       setOverlayData(recordingService.getOverlayData());
     }, 1000);
 
-    // Animación de pulso para el indicador de grabación
-    const pulseAnimation = Animated.loop(
+    const pulse = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
-          toValue: 1.2,
-          duration: 800,
+          toValue: 1.25,
+          duration: 850,
           useNativeDriver: true,
         }),
         Animated.timing(pulseAnim, {
           toValue: 1,
-          duration: 800,
+          duration: 850,
           useNativeDriver: true,
         }),
       ])
     );
-    pulseAnimation.start();
+
+    pulse.start();
 
     return () => {
       clearInterval(interval);
-      pulseAnimation.stop();
+      pulse.stop();
     };
   }, []);
 
+  /** Flash LookOut */
+  const triggerFlash = () => {
+    flashAnim.setValue(1);
+    Animated.timing(flashAnim, {
+      toValue: 0,
+      duration: 500,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  /** Cuando presionan LOOKOUT */
+  const handleLookoutPress = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    triggerFlash();
+    onLookout();
+  };
+
+  /** ============================
+   *         MODO MINIMIZADO
+   * ============================ */
   if (isMinimized) {
     return (
-      <View style={styles.minimizedContainer}>
-        <View style={styles.minimizedContent}>
-          <View style={styles.recordingIndicator}>
-            <Animated.View style={[styles.recordingDot, { transform: [{ scale: pulseAnim }] }]} />
-            <Text style={styles.minimizedTimer}>
-              {Math.floor(estado.segundosGrabando / 60)}:{(estado.segundosGrabando % 60).toString().padStart(2, '0')}
-            </Text>
-          </View>
+      <>
+        <Animated.View
+          {...panResponder.panHandlers}
+          style={[
+            styles.bubble,
+            {
+              transform: [...pan.getTranslateTransform()],
+            },
+          ]}
+        >
+          <Animated.View
+            style={[
+              styles.recordingDotMini,
+              { transform: [{ scale: pulseAnim }] },
+            ]}
+          />
 
-          <View style={styles.minimizedButtons}>
-            <TouchableOpacity style={styles.miniButton} onPress={onLookout}>
-              <Camera color={Colors.dark.text} size={20} />
-            </TouchableOpacity>
+          <TouchableOpacity onPress={handleLookoutPress}>
+            <Camera size={22} color="#fff" />
+          </TouchableOpacity>
 
-            <TouchableOpacity style={styles.miniButton} onPress={onDetener}>
-              <Square color={Colors.dark.error} size={20} fill={Colors.dark.error} />
-            </TouchableOpacity>
+          <TouchableOpacity onPress={onDetener}>
+            <Square size={22} color="#ff4444" fill="#ff4444" />
+          </TouchableOpacity>
 
-            <TouchableOpacity style={styles.miniButton} onPress={onToggleSize}>
-              <Maximize2 color={Colors.dark.text} size={20} />
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
+          <TouchableOpacity onPress={onToggleSize}>
+            <Maximize2 size={22} color="#fff" />
+          </TouchableOpacity>
+        </Animated.View>
+
+        {/* Flash animation */}
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.flashOverlay,
+            {
+              opacity: flashAnim,
+            },
+          ]}
+        />
+      </>
     );
   }
 
+  /** ============================
+   *         MODO COMPLETO
+   * ============================ */
   return (
-    <View style={styles.fullContainer}>
-      <View style={styles.overlayHeader}>
-        <View style={styles.recordingBadge}>
-          <Animated.View style={[styles.recordingDot, { transform: [{ scale: pulseAnim }] }]} />
-          <Text style={styles.recordingText}>GRABANDO</Text>
+    <>
+      <View style={styles.fullContainer}>
+        {/* HEADER */}
+        <View style={styles.overlayHeader}>
+          <View style={styles.recordingBadge}>
+            <Animated.View
+              style={[
+                styles.recordingDot,
+                { transform: [{ scale: pulseAnim }] },
+              ]}
+            />
+            <Text style={styles.recordingText}>GRABANDO</Text>
+          </View>
+
+          <TouchableOpacity style={styles.headerButton} onPress={onToggleSize}>
+            <Minimize2 size={24} color="#fff" />
+          </TouchableOpacity>
         </View>
 
-        <TouchableOpacity style={styles.headerButton} onPress={onToggleSize}>
-          <Minimize2 color={Colors.dark.text} size={24} />
-        </TouchableOpacity>
-      </View>
+        {/* DATOS */}
+        <View style={styles.overlayData}>
+          <Text style={styles.dataLine}>
+            Velocidad: <Text style={styles.dataValue}>{overlayData.velocidad} km/h</Text>
+          </Text>
 
-      <View style={styles.overlayData}>
-        <View style={styles.dataRow}>
-          <Text style={styles.dataLabel}>Velocidad:</Text>
-          <Text style={styles.dataValue}>{overlayData.velocidad} km/h</Text>
-        </View>
-        <View style={styles.dataRow}>
-          <Text style={styles.dataLabel}>Ubicación:</Text>
-          <Text style={styles.dataValue}>
-            {overlayData.latitud.toFixed(4)}, {overlayData.longitud.toFixed(4)}
+          <Text style={styles.dataLine}>
+            Ubicación:{" "}
+            <Text style={styles.dataValue}>
+              {overlayData.latitud.toFixed(4)}, {overlayData.longitud.toFixed(4)}
+            </Text>
+          </Text>
+
+          <Text style={styles.dataLine}>
+            Hora: <Text style={styles.dataValue}>{overlayData.hora}</Text>
           </Text>
         </View>
-        <View style={styles.dataRow}>
-          <Text style={styles.dataLabel}>Hora:</Text>
-          <Text style={styles.dataValue}>{overlayData.hora}</Text>
-        </View>
-      </View>
 
-      <View style={styles.controls}>
-        <View style={styles.timerContainer}>
+        {/* CONTROLES */}
+        <View style={styles.controls}>
           <Text style={styles.timerText}>
-            {Math.floor(estado.segundosGrabando / 60)}:{(estado.segundosGrabando % 60).toString().padStart(2, '0')}
+            {Math.floor(estado.segundosGrabando / 60)}:
+            {(estado.segundosGrabando % 60).toString().padStart(2, "0")}
           </Text>
-          <Text style={styles.timerSubtext}>
+
+          <Text style={styles.timerSub}>
             Buffer: {estado.segmentosEnBuffer} segmentos
           </Text>
-        </View>
 
-        <View style={styles.buttonRow}>
-          <TouchableOpacity style={styles.lookoutButton} onPress={onLookout}>
-            <Camera color={Colors.dark.text} size={28} />
-            <Text style={styles.lookoutButtonText}>LOOKOUT</Text>
-          </TouchableOpacity>
+          <View style={styles.row}>
+            <TouchableOpacity
+              style={styles.lookoutButton}
+              onPress={handleLookoutPress}
+            >
+              <Camera size={28} color="#fff" />
+              <Text style={styles.lookoutText}>LOOKOUT</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity style={styles.stopButton} onPress={onDetener}>
-            <Square color={Colors.dark.text} size={28} fill={Colors.dark.text} />
-            <Text style={styles.stopButtonText}>DETENER</Text>
-          </TouchableOpacity>
+            <TouchableOpacity style={styles.stopButton} onPress={onDetener}>
+              <Square size={28} color="#fff" fill="#fff" />
+              <Text style={styles.stopText}>DETENER</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
-    </View>
+
+      {/* Flash */}
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.flashOverlay, { opacity: flashAnim }]}
+      />
+    </>
   );
 }
 
+/* =======================================================================
+   ESTILOS
+======================================================================= */
+
 const styles = StyleSheet.create({
-  // Estilos minimizados
-  minimizedContainer: {
-    position: 'absolute',
-    top: 60,
-    right: Spacing.md,
-    backgroundColor: 'rgba(10, 10, 10, 0.95)',
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.sm,
+  /* --- Burbuja flotante --- */
+  bubble: {
+    position: "absolute",
+    backgroundColor: "rgba(0,0,0,0.85)",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 40,
+    gap: 10,
+    zIndex: 2000,
     borderWidth: 2,
     borderColor: Colors.dark.primary,
-    zIndex: 1000,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 8,
-      },
-    }),
   },
-  minimizedContent: {
-    gap: Spacing.sm,
-  },
-  minimizedTimer: {
-    ...Typography.body,
-    color: Colors.dark.text,
-    fontWeight: '600',
-    marginLeft: Spacing.xs,
-  },
-  minimizedButtons: {
-    flexDirection: 'row',
-    gap: Spacing.xs,
-  },
-  miniButton: {
-    width: 40,
-    height: 40,
-    backgroundColor: Colors.dark.surface,
-    borderRadius: BorderRadius.md,
-    justifyContent: 'center',
-    alignItems: 'center',
+  recordingDotMini: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: Colors.dark.error,
   },
 
-  // Estilos completos
+  /* --- Flash --- */
+  flashOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "white",
+    zIndex: 9999,
+  },
+
+  /* --- Modo completo --- */
   fullContainer: {
-    position: 'absolute',
-    top: 0,
+    position: "absolute",
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(10, 10, 10, 0.95)',
-    padding: Spacing.md,
+    top: 0,
     paddingTop: 60,
-    zIndex: 1000,
+    paddingHorizontal: Spacing.md,
+    paddingBottom: 14,
+    backgroundColor: "rgba(0,0,0,0.92)",
     borderBottomWidth: 2,
     borderBottomColor: Colors.dark.primary,
+    zIndex: 1000,
   },
+
   overlayHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.md,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
   },
+
   recordingBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: Colors.dark.error,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.full,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
   },
-  recordingIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
+
   recordingDot: {
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: Colors.dark.error,
+    backgroundColor: Colors.dark.background,
   },
+
   recordingText: {
-    ...Typography.caption,
-    color: Colors.dark.text,
-    fontWeight: '700',
-    marginLeft: Spacing.sm,
+    color: "#fff",
+    fontWeight: "700",
+    marginLeft: 8,
   },
+
   headerButton: {
-    width: 44,
-    height: 44,
     backgroundColor: Colors.dark.surface,
-    borderRadius: BorderRadius.md,
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 40,
+    height: 40,
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 12,
   },
+
   overlayData: {
-    backgroundColor: Colors.dark.surface,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
-    marginBottom: Spacing.md,
-    gap: Spacing.sm,
+    marginBottom: 14,
+    gap: 6,
   },
-  dataRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  dataLabel: {
-    ...Typography.body,
+
+  dataLine: {
     color: Colors.dark.textSecondary,
+    fontSize: 14,
   },
+
   dataValue: {
-    ...Typography.body,
     color: Colors.dark.text,
-    fontWeight: '600',
+    fontWeight: "700",
   },
+
   controls: {
-    gap: Spacing.md,
+    alignItems: "center",
+    gap: 8,
   },
-  timerContainer: {
-    alignItems: 'center',
-  },
+
   timerText: {
-    ...Typography.h1,
-    color: Colors.dark.text,
-    fontWeight: '700',
+    fontSize: 32,
+    color: "#fff",
+    fontWeight: "700",
   },
-  timerSubtext: {
-    ...Typography.caption,
+
+  timerSub: {
     color: Colors.dark.textSecondary,
   },
-  buttonRow: {
-    flexDirection: 'row',
-    gap: Spacing.md,
+
+  row: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 10,
   },
+
   lookoutButton: {
     flex: 1,
     backgroundColor: Colors.dark.primary,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.md,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: Spacing.sm,
+    paddingVertical: 13,
+    borderRadius: 12,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 8,
   },
-  lookoutButtonText: {
-    ...Typography.button,
-    color: Colors.dark.text,
+
+  lookoutText: {
+    color: "#fff",
+    fontWeight: "800",
   },
+
   stopButton: {
     flex: 1,
     backgroundColor: Colors.dark.error,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.md,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: Spacing.sm,
+    paddingVertical: 13,
+    borderRadius: 12,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 8,
   },
-  stopButtonText: {
-    ...Typography.button,
-    color: Colors.dark.text,
+
+  stopText: {
+    color: "#fff",
+    fontWeight: "800",
   },
 });

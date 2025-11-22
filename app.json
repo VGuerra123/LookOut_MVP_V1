@@ -1,31 +1,40 @@
 {
   "expo": {
     "name": "LookOut",
-    "slug": "--LookOut--",
+    "slug": "lookout",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "myapp",
+    "scheme": "lookout",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
 
     "plugins": [
       "expo-router",
       "expo-font",
       "expo-web-browser",
+
+      "./app/plugins/lookout-android",
+      "./app/plugins/lookout-ios",
+
       [
         "expo-camera",
         {
           "cameraPermission": "Necesitamos acceder a la cámara para grabar video.",
-          "microphonePermission": "Necesitamos acceder al micrófono para grabar audio."
+          "microphonePermission": "Necesitamos acceder al micrófono para comandos de voz."
         }
       ]
     ],
 
     "android": {
+      "package": "com.lookout.dashcam",
       "permissions": [
         "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION",
+        "android.permission.WAKE_LOCK"
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
@@ -34,10 +43,12 @@
     },
 
     "ios": {
+      "bundleIdentifier": "com.lookout.dashcam",
       "supportsTablet": true,
       "infoPlist": {
         "NSCameraUsageDescription": "Necesitamos acceder a la cámara para grabar video.",
-        "NSMicrophoneUsageDescription": "Necesitamos acceder al micrófono para grabar audio."
+        "NSMicrophoneUsageDescription": "Necesitamos acceder al micrófono para comandos de voz.",
+        "NSSpeechRecognitionUsageDescription": "LookOut usa reconocimiento de voz local para activar eventos por seguridad."
       }
     },
 
@@ -49,6 +60,15 @@
 
     "experiments": {
       "typedRoutes": true
+    },
+
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "7bae1708-361d-41ef-a000-b4ee92b1b3db"
+      },
+      "supabaseUrl": "https://zrhcviletiaoyetfxbrf.supabase.co",
+      "supabaseAnonKey": "eyJhbGc…"
     }
   }
 }
